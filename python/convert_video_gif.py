@@ -101,7 +101,7 @@ def main():
     video_size = get_video_size(args.ffmpeg, args.input)
 
     crop_parameters = calculate_crop_parameters(
-        args.top_left, args.bottom_right, video_size
+        args.top_left, args.bottom_right, video_size, args.fps
     )
 
     cmd = [

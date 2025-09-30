@@ -1,0 +1,30 @@
+[project]
+name = "meeting-summary"
+version = "0.1.0"
+description = "AI-powered meeting transcription summary tool"
+authors = [
+    {name = "Zongliang Hou", email = "zonglianghou2017@gmail.com"},
+]
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "openai>=1.0.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.1.0",
+]
+
+[project.scripts]
+meeting-summary = "meeting_summary.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv.sources]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/meeting_summary"]

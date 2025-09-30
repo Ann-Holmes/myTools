@@ -1,0 +1,8 @@
+Speaker 1: Good morning everyone. Let's start our weekly project meeting. I'd like to review our progress on the new feature development.
+Speaker 2: Morning. I have some updates on the backend API. We've completed the authentication module and are now working on the data processing pipeline.
+Speaker 1: That's great progress. What's the current status of the frontend development?
+Speaker 3: We've finished the user interface design and are now implementing the main dashboard. We expect to complete it by next week.
+Speaker 2: We need to coordinate the API integration between frontend and backend. I suggest we schedule a technical sync meeting.
+Speaker 1: Good idea. Let's set that up for Thursday. Any other updates or blockers?
+Speaker 3: We're waiting for the final design assets from the design team. Once we have those, we can complete the UI implementation.
+Speaker 1: I'll follow up with the design team. Let's aim to have the MVP ready by the end of the month.

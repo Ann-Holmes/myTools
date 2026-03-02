@@ -5,6 +5,7 @@ import http.server
 import socketserver
 import os
 import logging
+import socket
 from functools import partial
 
 # Configure logging
@@ -37,6 +38,18 @@ class BrowserFriendlyHandler(http.server.SimpleHTTPRequestHandler):
         logger.info("%s %s", client_ip, args[0])
 
 
+def get_local_ip():
+    """Get the local IP address of the machine."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
+
 def run_server(port=8000, directory=None):
     """Start HTTP server."""
     if directory:
@@ -47,8 +60,11 @@ def run_server(port=8000, directory=None):
     # Allow address reuse to avoid "Address already in use" errors
     socketserver.TCPServer.allow_reuse_address = True
 
-    with socketserver.TCPServer(("", port), handler) as httpd:
+    # Bind to all interfaces (0.0.0.0) for LAN access
+    with socketserver.TCPServer(("0.0.0.0", port), handler) as httpd:
+        local_ip = get_local_ip()
         logger.info("Serving at http://localhost:%s", port)
+        logger.info("Serving at http://%s:%s (LAN access)", local_ip, port)
         logger.info("Directory: %s", os.getcwd())
         logger.info("Press Ctrl+C to stop")
         try:

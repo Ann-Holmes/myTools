@@ -32,7 +32,9 @@ class BrowserFriendlyHandler(http.server.SimpleHTTPRequestHandler):
         return os.path.join(root, path)
 
     def log_message(self, format, *args):
-        logger.info("%s %s", self.address_string(), args[0])
+        # Use client_address[0] directly to avoid DNS reverse lookup
+        client_ip = self.client_address[0]
+        logger.info("%s %s", client_ip, args[0])
 
 
 def run_server(port=8000, directory=None):
@@ -41,6 +43,9 @@ def run_server(port=8000, directory=None):
         os.chdir(directory)
 
     handler = partial(BrowserFriendlyHandler, directory=os.getcwd())
+
+    # Allow address reuse to avoid "Address already in use" errors
+    socketserver.TCPServer.allow_reuse_address = True
 
     with socketserver.TCPServer(("", port), handler) as httpd:
         logger.info("Serving at http://localhost:%s", port)

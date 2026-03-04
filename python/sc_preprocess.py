@@ -251,7 +251,7 @@ def plot_qc_violin(adata: sc.AnnData, output_dir: Path):
         adata,
         keys=["n_genes_by_counts", "total_counts", "percent_mt", "percent_hb"],
         rotation=45,
-        save="violin.png",
+        save={"fname": "violin.png", "dpi": 150},
         show=False,
     )
     # Move the saved figure to the output directory
@@ -279,7 +279,7 @@ def plot_qc_scatter(adata: sc.AnnData, output_dir: Path):
         x="n_genes_by_counts",
         y="total_counts",
         color="percent_mt",
-        save="scatter.png",
+        save={"fname": "scatter.png", "dpi": 150},
         show=False,
     )
     # Move the saved figure to the output directory

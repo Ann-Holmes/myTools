@@ -187,6 +187,27 @@ def calculate_qc_metrics(adata: sc.AnnData) -> sc.AnnData:
         adata, qc_vars=["mt", "hb"], percent_top=None, log1p=False, inplace=True
     )
 
+    # Log QC metrics statistics
+    logger.info("  - QC Metrics Statistics (before filtering):")
+    logger.info(f"      total_counts - mean: {adata.obs['total_counts'].mean():.2f}, "
+                f"median: {adata.obs['total_counts'].median():.2f}, "
+                f"min: {adata.obs['total_counts'].min():.2f}, "
+                f"max: {adata.obs['total_counts'].max():.2f}")
+    logger.info(f"      n_genes_by_counts - mean: {adata.obs['n_genes_by_counts'].mean():.2f}, "
+                f"median: {adata.obs['n_genes_by_counts'].median():.2f}, "
+                f"min: {adata.obs['n_genes_by_counts'].min():.2f}, "
+                f"max: {adata.obs['n_genes_by_counts'].max():.2f}")
+    if "percent_mt" in adata.obs.columns:
+        logger.info(f"      percent_mt - mean: {adata.obs['percent_mt'].mean():.2f}, "
+                    f"median: {adata.obs['percent_mt'].median():.2f}, "
+                    f"min: {adata.obs['percent_mt'].min():.2f}, "
+                    f"max: {adata.obs['percent_mt'].max():.2f}")
+    if "percent_hb" in adata.obs.columns:
+        logger.info(f"      percent_hb - mean: {adata.obs['percent_hb'].mean():.2f}, "
+                    f"median: {adata.obs['percent_hb'].median():.2f}, "
+                    f"min: {adata.obs['percent_hb'].min():.2f}, "
+                    f"max: {adata.obs['percent_hb'].max():.2f}")
+
     return adata
 
 
@@ -218,19 +239,36 @@ def filter_cells(
     sc.AnnData
         Filtered annotated data matrix.
     """
+    n_cells_before = adata.n_obs
+
     # Filter cells by minimum number of genes
     sc.pp.filter_cells(adata, min_genes=min_genes)
+    n_cells_after_min_genes = adata.n_obs
+    logger.info(f"      Filter by min_genes={min_genes}: {n_cells_before - n_cells_after_min_genes} cells removed, "
+                f"{n_cells_after_min_genes} remaining")
 
     # Filter genes by minimum number of cells
+    n_genes_before = adata.n_vars
     sc.pp.filter_genes(adata, min_cells=min_cells)
+    n_genes_after = adata.n_vars
+    logger.info(f"      Filter by min_cells={min_cells}: {n_genes_before - n_genes_after} genes removed, "
+                f"{n_genes_after} remaining")
 
     # Filter cells by maximum mitochondrial gene percent
     if "percent_mt" in adata.obs.columns:
+        n_cells_before_mt = adata.n_obs
         adata = adata[adata.obs["percent_mt"] <= max_mt_percent, :]
+        n_cells_after_mt = adata.n_obs
+        logger.info(f"      Filter by max_mt_percent={max_mt_percent}: "
+                    f"{n_cells_before_mt - n_cells_after_mt} cells removed, {n_cells_after_mt} remaining")
 
     # Filter cells by maximum hemoglobin gene percent
     if "percent_hb" in adata.obs.columns:
+        n_cells_before_hb = adata.n_obs
         adata = adata[adata.obs["percent_hb"] <= max_hb_percent, :]
+        n_cells_after_hb = adata.n_obs
+        logger.info(f"      Filter by max_hb_percent={max_hb_percent}: "
+                    f"{n_cells_before_hb - n_cells_after_hb} cells removed, {n_cells_after_hb} remaining")
 
     return adata
 
@@ -346,55 +384,92 @@ def main():
     # Create output directory if it doesn't exist
     os.makedirs(args.output, exist_ok=True)
 
+    # Track processing results
+    successful_samples = []
+    failed_samples = []
+
     # Read input folders
     logger.info("\nReading input data:")
     logger.info("-" * 40)
     for folder_path in args.input:
-        logger.info(f"Reading {folder_path}...")
-        adata = read_10x_folder(folder_path)
-        n_cells_before, n_genes_before = adata.shape
-        logger.info(f"  - Cells before filtering: {n_cells_before}")
-        logger.info(f"  - Genes before filtering: {n_genes_before}")
-
-        # Calculate QC metrics
-        logger.info("Calculating QC metrics...")
-        adata = calculate_qc_metrics(adata)
-
-        # Filter cells and genes
-        logger.info("Filtering cells and genes...")
-        adata = filter_cells(
-            adata,
-            min_genes=args.min_genes,
-            min_cells=args.min_cells,
-            max_mt_percent=args.max_mt_percent,
-            max_hb_percent=args.max_hb_percent,
-        )
-
-        n_cells_after, n_genes_after = adata.shape
-        logger.info(f"  - Cells after filtering: {n_cells_after}")
-        logger.info(f"  - Genes after filtering: {n_genes_after}")
-
-        # Create output directory structure for the sample
         sample_name = Path(folder_path).name
-        sample_output_dir = Path(args.output) / sample_name
-        qc_plots_dir = sample_output_dir / "qc_plots"
-        qc_plots_dir.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Processing sample: {sample_name}")
+        logger.info("-" * 20)
 
-        # Generate QC plots
-        logger.info(f"\nGenerating QC plots for {sample_name}...")
-        plot_qc_violin(adata, qc_plots_dir)
-        plot_qc_scatter(adata, qc_plots_dir)
-        plot_pca_umap(adata, qc_plots_dir)
+        try:
+            logger.info(f"Reading {folder_path}...")
+            adata = read_10x_folder(folder_path)
+            n_cells_before, n_genes_before = adata.shape
+            logger.info(f"  - Cells before filtering: {n_cells_before}")
+            logger.info(f"  - Genes before filtering: {n_genes_before}")
 
-        # Save h5ad file
-        h5ad_path = sample_output_dir / f"{sample_name}.h5ad"
-        adata.write_h5ad(h5ad_path)
+            # Calculate QC metrics
+            logger.info("Calculating QC metrics...")
+            adata = calculate_qc_metrics(adata)
 
-        logger.info(f"  - Saved: {h5ad_path}")
-        logger.info(f"  - Saved: {qc_plots_dir / 'violin.png'}")
-        logger.info(f"  - Saved: {qc_plots_dir / 'scatter.png'}")
-        logger.info(f"  - Saved: {qc_plots_dir / 'pca_umap.png'}")
-    logger.info("-" * 40)
+            # Filter cells and genes
+            logger.info("Filtering cells and genes...")
+            adata = filter_cells(
+                adata,
+                min_genes=args.min_genes,
+                min_cells=args.min_cells,
+                max_mt_percent=args.max_mt_percent,
+                max_hb_percent=args.max_hb_percent,
+            )
+
+            n_cells_after, n_genes_after = adata.shape
+            logger.info(f"  - Cells after filtering: {n_cells_after}")
+            logger.info(f"  - Genes after filtering: {n_genes_after}")
+
+            # Create output directory structure for the sample
+            sample_output_dir = Path(args.output) / sample_name
+            qc_plots_dir = sample_output_dir / "qc_plots"
+            qc_plots_dir.mkdir(parents=True, exist_ok=True)
+
+            # Generate QC plots
+            logger.info(f"Generating QC plots for {sample_name}...")
+            plot_qc_violin(adata, qc_plots_dir)
+            plot_qc_scatter(adata, qc_plots_dir)
+            plot_pca_umap(adata, qc_plots_dir)
+
+            # Save h5ad file
+            h5ad_path = sample_output_dir / f"{sample_name}.h5ad"
+            adata.write_h5ad(h5ad_path)
+
+            # Log generated files
+            logger.info("Generated files:")
+            logger.info(f"  - {h5ad_path}")
+            logger.info(f"  - {qc_plots_dir / 'violin.png'}")
+            logger.info(f"  - {qc_plots_dir / 'scatter.png'}")
+            logger.info(f"  - {qc_plots_dir / 'pca_umap.png'}")
+
+            successful_samples.append(sample_name)
+
+        except Exception as e:
+            logger.error(f"Error processing sample '{sample_name}': {str(e)}")
+            logger.error(f"  Skipping sample '{sample_name}' and continuing with next sample...")
+            failed_samples.append(sample_name)
+            continue
+
+    # Print summary
+    logger.info("\n" + "=" * 60)
+    logger.info("Processing Summary")
+    logger.info("=" * 60)
+    logger.info(f"Total samples: {len(args.input)}")
+    logger.info(f"Successfully processed: {len(successful_samples)}")
+    logger.info(f"Failed: {len(failed_samples)}")
+
+    if successful_samples:
+        logger.info("\nSuccessfully processed samples:")
+        for sample in successful_samples:
+            logger.info(f"  - {sample}")
+
+    if failed_samples:
+        logger.info("\nFailed samples:")
+        for sample in failed_samples:
+            logger.info(f"  - {sample}")
+
+    logger.info("=" * 60)
 
 
 if __name__ == "__main__":

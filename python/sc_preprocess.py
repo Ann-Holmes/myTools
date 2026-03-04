@@ -7,9 +7,6 @@ including filtering cells and genes based on various quality control metrics.
 """
 
 import argparse
-import os
-import sys
-from pathlib import Path
 
 
 def parse_args():

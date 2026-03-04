@@ -12,14 +12,14 @@ import os
 import re
 from pathlib import Path
 
+import matplotlib
+matplotlib.use('Agg')  # 使用非交互式后端
+import matplotlib.pyplot as plt
 import numpy as np
 import scanpy as sc
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -30,46 +30,48 @@ def parse_args():
     )
 
     parser.add_argument(
-        "-i", "--input",
+        "-i",
+        "--input",
         type=str,
         nargs="+",
         required=True,
-        help="Input folders containing single-cell data files (required)"
+        help="Input folders containing single-cell data files (required)",
     )
 
     parser.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         type=str,
         default="./output",
-        help="Output directory for processed data (default: ./output)"
+        help="Output directory for processed data (default: ./output)",
     )
 
     parser.add_argument(
         "--min-genes",
         type=int,
         default=200,
-        help="Minimum number of genes per cell (default: 200)"
+        help="Minimum number of genes per cell (default: 200)",
     )
 
     parser.add_argument(
         "--min-cells",
         type=int,
         default=3,
-        help="Minimum number of cells per gene (default: 3)"
+        help="Minimum number of cells per gene (default: 3)",
     )
 
     parser.add_argument(
         "--max-mt-percent",
         type=float,
         default=5,
-        help="Maximum percentage of mitochondrial genes allowed per cell (default: 5)"
+        help="Maximum percentage of mitochondrial genes allowed per cell (default: 5)",
     )
 
     parser.add_argument(
         "--max-hb-percent",
         type=float,
         default=5,
-        help="Maximum percentage of hemoglobin genes allowed per cell (default: 5)"
+        help="Maximum percentage of hemoglobin genes allowed per cell (default: 5)",
     )
 
     return parser.parse_args()
@@ -181,12 +183,20 @@ def calculate_qc_metrics(adata: sc.AnnData) -> sc.AnnData:
     adata.var["hb"] = adata.var_names.isin(hb_genes)
 
     # Calculate QC metrics
-    sc.pp.calculate_qc_metrics(adata, qc_vars=["mt", "hb"], percent_top=None, log1p=False, inplace=True)
+    sc.pp.calculate_qc_metrics(
+        adata, qc_vars=["mt", "hb"], percent_top=None, log1p=False, inplace=True
+    )
 
     return adata
 
 
-def filter_cells(adata: sc.AnnData, min_genes: int, min_cells: int, max_mt_percent: float, max_hb_percent: float) -> sc.AnnData:
+def filter_cells(
+    adata: sc.AnnData,
+    min_genes: int,
+    min_cells: int,
+    max_mt_percent: float,
+    max_hb_percent: float,
+) -> sc.AnnData:
     """
     Filter cells and genes based on quality control thresholds.
 
@@ -223,6 +233,99 @@ def filter_cells(adata: sc.AnnData, min_genes: int, min_cells: int, max_mt_perce
         adata = adata[adata.obs["percent_hb"] <= max_hb_percent, :]
 
     return adata
+
+
+def plot_qc_violin(adata: sc.AnnData, output_dir: Path):
+    """
+    Plot violin plots for QC metrics.
+
+    Parameters
+    ----------
+    adata : sc.AnnData
+        Annotated data matrix with QC metrics in obs.
+    output_dir : Path
+        Directory to save the violin plot.
+    """
+    logger.info("Generating violin plot...")
+    sc.pl.violin(
+        adata,
+        keys=["n_genes_by_counts", "total_counts", "percent_mt", "percent_hb"],
+        rotation=45,
+        save="violin.png",
+        show=False,
+    )
+    # Move the saved figure to the output directory
+    output_path = output_dir / "violin.png"
+    if Path("figures/violin.png").exists():
+        Path("figures/violin.png").rename(output_path)
+        Path("figures").rmdir()
+    plt.close()
+
+
+def plot_qc_scatter(adata: sc.AnnData, output_dir: Path):
+    """
+    Plot scatter plot for QC metrics.
+
+    Parameters
+    ----------
+    adata : sc.AnnData
+        Annotated data matrix with QC metrics in obs.
+    output_dir : Path
+        Directory to save the scatter plot.
+    """
+    logger.info("Generating scatter plot...")
+    sc.pl.scatter(
+        adata,
+        x="n_genes_by_counts",
+        y="total_counts",
+        color="percent_mt",
+        save="scatter.png",
+        show=False,
+    )
+    # Move the saved figure to the output directory
+    output_path = output_dir / "scatter.png"
+    if Path("figures/scatter.png").exists():
+        Path("figures/scatter.png").rename(output_path)
+        Path("figures").rmdir()
+    plt.close()
+
+
+def plot_pca_umap(adata: sc.AnnData, output_dir: Path):
+    """
+    Plot PCA and UMAP for QC metrics.
+
+    Parameters
+    ----------
+    adata : sc.AnnData
+        Annotated data matrix with QC metrics in obs.
+    output_dir : Path
+        Directory to save the PCA and UMAP plots.
+    """
+    logger.info("Running PCA...")
+    n_comps = min(50, adata.n_vars - 1)
+    sc.pp.pca(adata, n_comps=n_comps)
+
+    logger.info("Computing neighbors...")
+    sc.pp.neighbors(adata)
+
+    logger.info("Running UMAP...")
+    sc.tl.umap(adata)
+
+    logger.info("Generating PCA and UMAP plots...")
+    # Create 1x2 subplots
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+    # Plot PCA
+    sc.pl.pca(adata, color="n_genes_by_counts", ax=axes[0], show=False, title="PCA")
+
+    # Plot UMAP
+    sc.pl.umap(adata, color="n_genes_by_counts", ax=axes[1], show=False, title="UMAP")
+
+    # Save the figure
+    output_path = output_dir / "pca_umap.png"
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150, bbox_inches="tight")
+    plt.close()
 
 
 def main():
@@ -264,12 +367,33 @@ def main():
             min_genes=args.min_genes,
             min_cells=args.min_cells,
             max_mt_percent=args.max_mt_percent,
-            max_hb_percent=args.max_hb_percent
+            max_hb_percent=args.max_hb_percent,
         )
 
         n_cells_after, n_genes_after = adata.shape
         logger.info(f"  - Cells after filtering: {n_cells_after}")
         logger.info(f"  - Genes after filtering: {n_genes_after}")
+
+        # Create output directory structure for the sample
+        sample_name = Path(folder_path).name
+        sample_output_dir = Path(args.output) / sample_name
+        qc_plots_dir = sample_output_dir / "qc_plots"
+        qc_plots_dir.mkdir(parents=True, exist_ok=True)
+
+        # Generate QC plots
+        logger.info(f"\nGenerating QC plots for {sample_name}...")
+        plot_qc_violin(adata, qc_plots_dir)
+        plot_qc_scatter(adata, qc_plots_dir)
+        plot_pca_umap(adata, qc_plots_dir)
+
+        # Save h5ad file
+        h5ad_path = sample_output_dir / f"{sample_name}.h5ad"
+        adata.write_h5ad(h5ad_path)
+
+        logger.info(f"  - Saved: {h5ad_path}")
+        logger.info(f"  - Saved: {qc_plots_dir / 'violin.png'}")
+        logger.info(f"  - Saved: {qc_plots_dir / 'scatter.png'}")
+        logger.info(f"  - Saved: {qc_plots_dir / 'pca_umap.png'}")
     logger.info("-" * 40)
 
 

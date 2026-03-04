@@ -7,6 +7,18 @@ including filtering cells and genes based on various quality control metrics.
 """
 
 import argparse
+import logging
+from pathlib import Path
+
+import numpy as np
+import scanpy as sc
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(message)s"
+)
+logger = logging.getLogger(__name__)
 
 
 def parse_args():
@@ -61,20 +73,70 @@ def parse_args():
     return parser.parse_args()
 
 
+def read_10x_folder(folder_path: str) -> sc.AnnData:
+    """
+    Read 10x Genomics formatted single-cell data from a folder.
+
+    Parameters
+    ----------
+    folder_path : str
+        Path to the folder containing 10x format files.
+
+    Returns
+    -------
+    sc.AnnData
+        Annotated data matrix with cells as observations and genes as variables.
+    """
+    folder = Path(folder_path)
+
+    # Check required files exist
+    required_files = ["matrix.mtx.gz", "genes.tsv.gz", "barcodes.tsv.gz"]
+    for filename in required_files:
+        file_path = folder / filename
+        if not file_path.exists():
+            raise FileNotFoundError(f"Required file not found: {file_path}")
+
+    # Read matrix file and transpose
+    adata = sc.read_mtx(folder / "matrix.mtx.gz").transpose()
+
+    # Read genes: column 0 is gene_name, column 1 is gene_id (if present)
+    genes = np.loadtxt(folder / "genes.tsv.gz", dtype=str, delimiter="\t")
+    adata.var_names = genes[:, 0]
+    if genes.shape[1] > 1:
+        adata.var["gene_id"] = genes[:, 1]
+
+    # Read barcodes
+    barcodes = np.loadtxt(folder / "barcodes.tsv.gz", dtype=str, delimiter="\t")
+    adata.obs_names = barcodes
+
+    return adata
+
+
 def main():
     """Main function to run the preprocessing pipeline."""
     args = parse_args()
 
-    print("=" * 60)
-    print("Single-cell Preprocessing Parameters")
-    print("=" * 60)
-    print(f"Input folders: {args.input}")
-    print(f"Output directory: {args.output}")
-    print(f"Minimum genes per cell: {args.min_genes}")
-    print(f"Minimum cells per gene: {args.min_cells}")
-    print(f"Maximum mitochondrial gene percent: {args.max_mt_percent}")
-    print(f"Maximum hemoglobin gene percent: {args.max_hb_percent}")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info("Single-cell Preprocessing Parameters")
+    logger.info("=" * 60)
+    logger.info(f"Input folders: {args.input}")
+    logger.info(f"Output directory: {args.output}")
+    logger.info(f"Minimum genes per cell: {args.min_genes}")
+    logger.info(f"Minimum cells per gene: {args.min_cells}")
+    logger.info(f"Maximum mitochondrial gene percent: {args.max_mt_percent}")
+    logger.info(f"Maximum hemoglobin gene percent: {args.max_hb_percent}")
+    logger.info("=" * 60)
+
+    # Read input folders
+    logger.info("\nReading input data:")
+    logger.info("-" * 40)
+    for folder_path in args.input:
+        logger.info(f"Reading {folder_path}...")
+        adata = read_10x_folder(folder_path)
+        n_cells, n_genes = adata.shape
+        logger.info(f"  - Cells: {n_cells}")
+        logger.info(f"  - Genes: {n_genes}")
+    logger.info("-" * 40)
 
 
 if __name__ == "__main__":

@@ -23,7 +23,12 @@ def read_gtf(gtf_path: str) -> pd.DataFrame:
     # exon_number, exon_id
     gtf.insert(8, 'gene_id', gtf['attribute'].str.extract(r'gene_id "([^"]+)"'))
     gtf.insert(9, 'gene_name', gtf['attribute'].str.extract(r'gene_name "([^"]+)"'))
-    gtf.insert(10, 'gene_type', gtf['attribute'].str.extract(r'gene_type "([^"]+)"'))
+    if gtf['attribute'].str.contains(r'gene_type "([^"]+)"').any():
+        gtf.insert(10, 'gene_type', gtf['attribute'].str.extract(r'gene_type "([^"]+)"'))
+    elif gtf['attribute'].str.contains(r'gene_biotype "([^"]+)"').any():
+        gtf.insert(10, 'gene_type', gtf['attribute'].str.extract(r'gene_biotype "([^"]+)"'))
+    else:
+        gtf.insert(10, 'gene_type', None)
     gtf.insert(11, 'transcript_id', gtf['attribute'].str.extract(r'transcript_id "([^"]+)"'))
     gtf.insert(12, 'transcript_name', gtf['attribute'].str.extract(r'transcript_name "([^"]+)"'))
     gtf.insert(13, 'transcript_type', gtf['attribute'].str.extract(r'transcript_type "([^"]+)"'))
@@ -54,7 +59,12 @@ def read_gff3(gff3_path: str) -> pd.DataFrame:
     # exon_number, exon_id
     gtf.insert(8, 'gene_id', gtf['attribute'].str.extract(r'gene_id=([^;]+)'))
     gtf.insert(9, 'gene_name', gtf['attribute'].str.extract(r'gene_name=([^;]+)'))
-    gtf.insert(10, 'gene_type', gtf['attribute'].str.extract(r'gene_type=([^;]+)'))
+    if gtf['attribute'].str.contains(r'gene_type=([^;]+)').any():
+        gtf.insert(10, 'gene_type', gtf['attribute'].str.extract(r'gene_type=([^;]+)'))
+    elif gtf['attribute'].str.contains(r'gene_biotype=([^;]+)').any():
+        gtf.insert(10, 'gene_type', gtf['attribute'].str.extract(r'gene_biotype=([^;]+)'))
+    else:
+        gtf.insert(10, 'gene_type', None)
     gtf.insert(11, 'transcript_id', gtf['attribute'].str.extract(r'transcript_id=([^;]+)'))
     gtf.insert(12, 'transcript_name', gtf['attribute'].str.extract(r'transcript_name=([^;]+)'))
     gtf.insert(13, 'transcript_type', gtf['attribute'].str.extract(r'transcript_type=([^;]+)'))

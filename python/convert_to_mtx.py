@@ -219,14 +219,10 @@ def convert_sample_to_mtx(
     mmwrite(str(mtx_path), sparse_matrix)
 
     # Write features file (gene names with ID and name columns)
-    features_path.write_text(
-        "".join(f"{gene}\t{gene}\n" for gene in df.index)
-    )
+    features_path.write_text("".join(f"{gene}\t{gene}\tGene Expression\n" for gene in df.index))
 
     # Write barcodes file (extract just the barcode, remove sample suffix)
-    barcodes_path.write_text(
-        "".join(f"{barcode.split('_')[0]}\n" for barcode in df.columns)
-    )
+    barcodes_path.write_text("".join(f"{barcode.split('_')[0]}\n" for barcode in df.columns))
 
     # Compress all output files
     subprocess.run(f"gzip -f '{mtx_path}'", shell=True, check=True)
@@ -346,9 +342,7 @@ def main() -> int:
         temp_dir, samples = split_by_sample_awk(input_path, output_path)
 
         # Step 2: Convert to MTX in parallel
-        results = convert_samples_parallel(
-            temp_dir, samples, output_path, args.jobs
-        )
+        results = convert_samples_parallel(temp_dir, samples, output_path, args.jobs)
 
         # Cleanup temporary files
         if not args.keep_temp:

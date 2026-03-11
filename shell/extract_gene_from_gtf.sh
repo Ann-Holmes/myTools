@@ -31,3 +31,18 @@ if [[ ! "$input_file" =~ \.gtf\.gz$ ]]; then
     echo "Error: Input file must end with .gtf.gz: $input_file" >&2
     exit 1
 fi
+
+# Replace .gtf.gz with .gene.gtf.gz
+output_file="${input_file%.gtf.gz}.gene.gtf.gz"
+
+output_dir=$(dirname "$output_file")
+
+if [ ! -d "$output_dir" ]; then
+    echo "Error: Output directory does not exist: $output_dir" >&2
+    exit 1
+fi
+
+if [ ! -w "$output_dir" ]; then
+    echo "Error: Output directory is not writable: $output_dir" >&2
+    exit 1
+fi

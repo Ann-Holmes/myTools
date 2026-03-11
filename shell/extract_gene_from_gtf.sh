@@ -46,3 +46,20 @@ if [ ! -w "$output_dir" ]; then
     echo "Error: Output directory is not writable: $output_dir" >&2
     exit 1
 fi
+
+# Trap to clean up partial output on failure
+cleanup() {
+    if [ -f "$output_file" ]; then
+        rm -f "$output_file"
+    fi
+}
+
+trap cleanup EXIT
+
+# Extract gene entries and comments
+gzip -dc "$input_file" | awk '/^#/ || $3=="gene"' | gzip > "$output_file"
+
+# Disable trap on successful completion
+trap - EXIT
+
+echo "Successfully extracted gene entries to: $output_file"

@@ -106,6 +106,16 @@ Requires Python 3.12+ and transformers library.
 
 - **mergeMS.R**: Merge ProteinDiscovery outputs into a single Excel file.
 
+### Shell Scripts
+
+- **extract_gene_from_gtf.sh**: Extract gene entries from GTF files.
+
+  ```bash
+  ./shell/extract_gene_from_gtf.sh input.gtf.gz
+  # Output: input.gene.gtf.gz (same directory)
+  # Preserves comment lines, extracts only gene feature entries
+  ```
+
 ## Notes
 
 - Most Python scripts at the root level are standalone and can be run directly.

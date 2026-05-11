@@ -1,0 +1,2 @@
+example/*.h5ad filter=lfs diff=lfs merge=lfs -text
+example/*.db filter=lfs diff=lfs merge=lfs -text

@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.10"
+# ///
 """Analyze images with a local Ollama vision model via /api/generate.
 
 Usage:
-    ollama_vision.py <image> [question]
-    ollama_vision.py -m gemma4:e4b <image> "Describe this figure"
-    ollama_vision.py <image> -          # read question from stdin
+    uv run ollama_vision.py <image> [question]
+    uv run ollama_vision.py -m gemma4:e4b <image> "Describe this figure"
+    uv run ollama_vision.py <image> -          # read question from stdin
 
 Model (priority):
     1. -m / --model flag

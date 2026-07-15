@@ -1,87 +1,117 @@
 ---
 name: ollama-vision
-description: "Bypass Hermes vision_analyze 2000-token cap — call Ollama directly for full-resolution image analysis. Use when the user needs detailed description of an image (figures, charts, protein structures, diagrams) where the built-in tool would truncate."
+description: "Comprehensive image skill: describe, extract, crop, and annotate images by calling Ollama directly. Use when the user needs to understand an image (describe contents, read text, analyze charts/diagrams/screenshots/photos/UI mockups), extract structured data from images (tables, forms, charts to JSON/CSV), extract or crop specific objects/regions from photos, or annotate images with bounding boxes. Always triggers on image-analysis requests — the built-in vision tool has limited token budget and no extraction/annotation capability."
+allowed-tools: Bash(uv run *ollama_vision.py *) Bash(uv run *ollama_crop.py *) Bash(uv run *ollama_draw.py *)
 ---
 
 # Ollama Vision
 
-Analyze images at full resolution by calling Ollama's native `/api/generate` endpoint directly. This bypasses the built-in `vision_analyze` tool which hardcodes `max_tokens: 2000` (and thus truncates detailed responses). The key advantage of `/api/generate` is the `think: false` parameter, which disables the model's thinking phase for ~15x faster image analysis.
+Analyze, extract, crop, and annotate images by calling Ollama's `/api/generate` endpoint directly.
 
 ## Core Principle
 
-**Vision model is for objective description — reasoning is for the agent.** Vision models have limited domain knowledge. Do NOT ask them to identify proteins, interpret results, or draw conclusions. Instead, ask them to describe exactly what they see — text, labels, colors, positions, structures, arrows, annotations. You (the agent) handle all reasoning and identification.
+**Vision model describes — agent reasons.** Vision models have limited domain knowledge. Do NOT ask them to identify specific entities, interpret results, or draw conclusions. Ask them to describe what they see: text, labels, colors, positions, structures, annotations. You handle all reasoning, identification, and interpretation.
 
-**Language**: Use whichever language the user is using. The vision model will respond in the same language as the question.
+**Language**: Respond in the same language the user is using.
 
-Good questions (any language works):
-- "Describe every visible element in panel A: ribbon structure, highlighted side chains, labels, and connecting lines."
-- "Read all text labels in this figure. List every annotation shown."
-- "Describe the secondary structure in panel B — which regions are β-sheet and which α-helix?"
+## Capabilities
 
-Bad questions:
-- ❌ "What protein is this?" — forces the model to guess and hallucinate
-- ❌ "Explain the significance of these mutations" — reasoning task, not description
-- ❌ "What biological process does this figure show?" — interpretation, not observation
+### 1. Image Description
 
-## Trigger
+Describe an entire image in detail. Tailor the prompt to the image type for best results:
 
-Use when:
-- User sends an image and asks for detailed description/analysis
-- User says "use ollama-vision" or "直接用 Ollama 读图"
-- The image is complex (multi-panel figures, diagrams, tables, protein structures) and you suspect 2000 tokens won't be enough
+**Charts / graphs**: "Describe this chart in detail: chart type, axis labels, scales, data series, legends, grid lines, and any annotations or callouts."
 
-## Steps
+**Screenshots**: "Describe everything visible in this screenshot: windows, dialogs, buttons, text fields, menus, text content, and the layout of UI elements."
 
-### 1. Locate the image
+**Photos**: "Describe this photo in detail: main subjects, background, colors, lighting, any text visible, and notable objects or people."
 
-Image path from the user's message.
-
-### 2. (Optional) Crop a sub-region first
-
-If you only need a specific region (e.g., a phone mockup, a chart from a screenshot), crop it first using the vision model to identify coordinates:
+**UI design mockups**: "Describe this UI design: layout structure, all components (buttons, inputs, cards, navigation), text labels, colors, spacing patterns, and visual hierarchy."
 
 ```bash
-uv run --with Pillow python3 /home/hzl/Work/Tmp/cc-workspace/.claude/skills/ollama-vision/scripts/ollama_crop.py \
-  "/path/to/image.jpg" \
-  "the phone mockup on the right side" \
-  /tmp/cropped.png
-```
-
-The vision model returns pixel coordinates as JSON, and the script crops with Pillow.
-
-**Important**: Crop from the original image BEFORE any resizing. Coordinates map to the original image dimensions.
-
-### 3. Analyze the image
-
-```bash
-uv run python3 /home/hzl/Work/Tmp/cc-workspace/.claude/skills/ollama-vision/scripts/ollama_vision.py \
-  "/path/to/image.jpg" \
-  "Describe every detail of this image. <user's specific question>"
+uv run scripts/ollama_vision.py image.png "Describe every detail of this <chart/screenshot/photo/UI>. <specific question>"
 ```
 
 Or pipe the question from stdin:
+
 ```bash
-echo "Describe this figure" | \
-  uv run python3 /home/hzl/Work/Tmp/cc-workspace/.claude/skills/ollama-vision/scripts/ollama_vision.py \
-  /path/to/image.jpg -
+echo "Describe this figure in detail" | uv run scripts/ollama_vision.py image.png -
 ```
 
-The script handles base64 encoding, API call, and prints the full response to stdout (up to 32000 tokens).
+### 2. Structured Extraction
 
-**Fallback (if `uv` is not available):** Use `python3` directly. The vision script uses only stdlib and does not require additional dependencies.
+Extract data from images into structured formats (JSON, CSV, tables). Useful for tables in screenshots, chart data, form fields, or any structured visual information.
 
-### 4. Present the result
+Key: explicitly request a specific output format in the prompt.
 
-The output is the full, untruncated analysis (up to 32000 tokens).
+**Table extraction**:
+```bash
+uv run scripts/ollama_vision.py table.png "Extract the data from this table. Return as a JSON array of objects, where each object represents one row with column headers as keys."
+```
+
+**Chart data extraction**:
+```bash
+uv run scripts/ollama_vision.py chart.png "Read all visible data from this chart. Return the values as a CSV string with columns: category, value."
+```
+
+**Form / UI field extraction**:
+```bash
+uv run scripts/ollama_vision.py form.png "List every form field visible in this screenshot. Return as JSON: [{label, type, options if dropdown, current_value if visible}]"
+```
+
+Always ask for a specific JSON/CSV schema in the prompt — do not rely on the model to guess the output format.
+
+### 3. Object Extraction (Crop)
+
+Crop a specific region or object from an image. The vision model locates the region by description, then Pillow crops it.
+
+```bash
+uv run scripts/ollama_crop.py photo.jpg "the phone on the right side" cropped.png
+```
+
+**Crop from the original image before any resizing.** Coordinates map to original pixel dimensions. Compression or resizing changes pixel coordinates.
+
+### 4. Object Annotation (Draw)
+
+Locate objects in an image and draw bounding boxes with labels. The vision model identifies regions and returns coordinates; Pillow draws the annotations.
+
+```bash
+uv run scripts/ollama_draw.py photo.jpg "all the people in this photo" annotated.png
+uv run scripts/ollama_draw.py --color blue screenshot.png "every button in the toolbar" toolbar_buttons.png
+```
+
+Available colors: red, green, blue, yellow, orange, cyan, magenta, white, black (or any hex color).
+
+## Scripts
+
+All scripts use stdlib `urllib` to call Ollama at `http://localhost:11434/api/generate`. Model selection (priority): `-m` flag → `OLLAMA_VISION_MODEL` env var → `qwen3.5:9b`.
+
+| Script | Purpose | Dependencies |
+|--------|---------|-------------|
+| `scripts/ollama_vision.py` | Full image analysis / description / structured extraction | None (stdlib) |
+| `scripts/ollama_crop.py` | Locate region by description and crop | Pillow (PEP 723) |
+| `scripts/ollama_draw.py` | Locate objects and draw bounding boxes | Pillow (PEP 723) |
+
+All scripts use PEP 723 inline metadata — `uv run <script>` auto-resolves dependencies.
+
+## Good vs Bad Questions
+
+Good (any output format, any language):
+- "Describe every visible element in panel A: ribbon structure, highlighted side chains, labels, and connecting lines."
+- "Read all text labels in this figure. List every annotation shown."
+- "Extract the data from this table as JSON: [{column1: value, ...}]"
+- "Describe the layout and all UI components in this screenshot."
+
+Bad:
+- "What protein is this?" — forces hallucination
+- "Explain the significance of these results" — interpretation, not observation
+- "Is this UI design good?" — subjective judgment, not description
 
 ## Notes
 
-- **Use `uv run python3`** for all Python calls. The vision script uses stdlib only; the crop script needs `--with Pillow`.
-- **Do not compress before cropping**: Compression changes pixel coordinates. Crop first from the original image, then compress if needed.
-- **Endpoint**: Ollama native `/api/generate` (NOT `/api/chat` or `/v1/chat/completions`). The `response` field contains the full output.
-- **`think: false`**: Disabling thinking for image description is the key to speed — ~9s vs ~2min for a 612KB image. Qwen3.5's `think` mode puts image analysis in the thinking phase; with `think: false`, it generates directly into `response`.
-- **`temperature: 0.3`**: Reduces repetitive loops that 9B models are prone to in long responses.
-- **`num_predict: 32000`**: Token budget for very detailed figures. Response is truncated when `done` is false due to token limit.
-- **Vision model → description; Agent → reasoning**: Qwen3.5:9b describes what it sees. You interpret, identify, and reason from the description. Never ask the vision model to identify proteins or draw conclusions.
-- **Response time**: Scales with token count. Default timeout is 300s. If the model is warming up (first request), it may take longer.
-- **Large images**: Avoid compressing if you need to crop. Only compress >2MB images when full-image analysis is the goal.
+- **Endpoint**: Ollama `/api/generate` (NOT `/api/chat`). The `response` field contains the output.
+- **`think: false`**: Disables thinking phase for ~15x faster image analysis.
+- **`temperature: 0.3`**: Reduces repetitive loops that small models are prone to in long responses.
+- **`num_predict: 32000`**: Token budget for detailed figures. Response is truncated when `done` is false.
+- **Timeout**: 300s. First request (model warm-up) may take longer.
+- **Large images (>2MB)**: Avoid compressing if you also need to crop or annotate — compression changes pixel coordinates.

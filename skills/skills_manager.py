@@ -14,7 +14,7 @@ def find_skills(root: Path) -> list[Path]:
     if not root.is_dir():
         return skills
     for entry in sorted(root.iterdir()):
-        if entry.is_dir() and (entry / "SKILL.md").exists():
+        if entry.is_dir() and (entry / "SKILL.md").exists() and ".bak." not in entry.name:
             skills.append(entry)
     return skills
 

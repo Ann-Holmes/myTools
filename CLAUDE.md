@@ -119,6 +119,7 @@ Requires Python 3.12+ and transformers library.
 ## Notes
 
 - Most Python scripts at the root level are standalone and can be run directly.
-- No unified testing or linting configuration exists for the collection (only meeting-summary has ruff configured).
+- No unified testing framework for the collection (meeting-summary uses ruff). Type-check Python with `ty` (`uv tool install ty`; run `~/.local/bin/ty check <file.py>` or `uv run ty check`).
+- Python conventions: prefer stdlib `argparse` for CLIs and stdlib `logging` for logs over hand-rolled code; annotate types (validated by `ty`).
 - The project uses conventional commits with emoji prefixes (✨, 🐞, etc.).
 - **IMPORTANT**: Don't include the "Co-Authored-By" line in commit messages.
